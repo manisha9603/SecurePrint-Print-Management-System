@@ -1,0 +1,6 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../main.dart';
+import '../widgets/job_card.dart';
+import '../widgets/connection_indicator.dart';
+class QueueScreen extends StatelessWidget { const QueueScreen({super.key}); @override Widget build(BuildContext context) { final state = context.watch<AppState>(); return Padding(padding: const EdgeInsets.all(32), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('QUEUE', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: const Color(0xFF00D97E), letterSpacing: 1.5)), const SizedBox(height: 8), Text('Print queue', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)), const SizedBox(height: 6), const Text('Local jobs waiting for their next signal.')]), ConnectionIndicator(connected: state.connected)]), const SizedBox(height: 28), Expanded(child: state.jobs.isEmpty ? const Center(child: Text('No jobs yet. Waiting for work.')) : ListView.builder(itemCount: state.jobs.length, itemBuilder: (_, index) { final job = state.jobs[index]; return JobCard(job, onRetry: () => state.retryJob(job), onCancel: () => state.cancelJob(job)); }))])); } }

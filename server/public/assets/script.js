@@ -1,0 +1,33 @@
+const api = (path, options = {}) => fetch(path, { ...options, headers: { ...(options.headers || {}), ...(localStorage.token ? { Authorization: `Bearer ${localStorage.token}` } : {}) } });
+const json = async (response) => { const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || 'Request failed'); return body; };
+const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#039;' }[char]));
+
+const loginForm = document.querySelector('#login-form');
+if (loginForm) loginForm.addEventListener('submit', async (event) => {
+  event.preventDefault(); const error = document.querySelector('#login-error'); error.textContent = '';
+  try { const result = await json(await api('/api/auth/admin-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(loginForm))) })); localStorage.token = result.token; location.href = '/dashboard.html'; } catch (err) { error.textContent = err.message; }
+});
+
+const requireLogin = () => { if (!localStorage.token) location.href = '/'; };
+const logout = document.querySelector('#logout');
+if (logout) { requireLogin(); logout.onclick = () => { localStorage.removeItem('token'); location.href = '/'; }; }
+
+async function loadDashboard() {
+  requireLogin();
+  try {
+    const [{ devices }, { jobs }] = await Promise.all([json(await api('/api/devices')), json(await api('/api/jobs?limit=20'))]);
+    const printers = await json(await api('/api/printers'));
+    document.querySelector('#device-count').textContent = devices.filter((device) => device.status === 'online').length;
+    document.querySelector('#printer-count').textContent = printers.printers.filter((printer) => printer.status === 'online').length;
+    document.querySelector('#queued-count').textContent = jobs.filter((job) => job.status === 'queued').length;
+    document.querySelector('#devices').innerHTML = devices.length ? devices.map((device) => `<div class="device-row"><div><div class="device-name">${escapeHtml(device.name)}</div><div class="device-meta">${device.printer_count} printer${device.printer_count === 1 ? '' : 's'} · last seen ${device.last_seen ? new Date(device.last_seen).toLocaleString() : 'never'}</div></div><span class="device-state">● ${escapeHtml(device.status)}</span></div>`).join('') : '<p class="muted">No devices registered yet.</p>';
+    renderJobs(jobs);
+  } catch (error) { if (error.message.includes('authentication')) { localStorage.removeItem('token'); location.href = '/'; } }
+}
+function renderJobs(jobs) { const target = document.querySelector('#jobs'); if (!target) return; target.innerHTML = jobs.length ? jobs.map((job) => `<tr><td>${escapeHtml(job.filename)}</td><td>${escapeHtml(job.printer_name || job.device_name || 'Unassigned')}</td><td><span class="status-pill ${job.status === 'failed' ? 'failed' : ''}">${escapeHtml(job.status)}</span></td><td>${new Date(job.created_at).toLocaleString()}</td></tr>`).join('') : '<tr><td colspan="4" class="muted">No jobs in the queue.</td></tr>'; }
+function connectAdminSocket() { if (!document.querySelector('#jobs')) return; const status = document.querySelector('#connection-status'); const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/admin?token=${encodeURIComponent(localStorage.token)}`); socket.onopen = () => { status.textContent = 'Live'; }; socket.onclose = () => { status.textContent = 'Reconnecting'; setTimeout(connectAdminSocket, 3000); }; socket.onmessage = (event) => { const message = JSON.parse(event.data); if (message.type === 'job_created' || message.type === 'job_updated' || message.type === 'device_status') loadDashboard(); }; }
+if (document.querySelector('#jobs')) { loadDashboard(); connectAdminSocket(); }
+
+async function loadUploadOptions() { requireLogin(); try { const [{ devices }, { printers }] = await Promise.all([json(await api('/api/devices')), json(await api('/api/printers'))]); const deviceSelect = document.querySelector('#target-device'); const printerSelect = document.querySelector('#target-printer'); deviceSelect.innerHTML = devices.map((device) => `<option value="${escapeHtml(device.id)}">${escapeHtml(device.name)}</option>`).join(''); printerSelect.innerHTML = '<option value="">Any available printer</option>' + printers.map((printer) => `<option value="${escapeHtml(printer.id)}">${escapeHtml(printer.name)} · ${escapeHtml(printer.device_name)}</option>`).join(''); } catch (error) { document.querySelector('#upload-error').textContent = error.message; } }
+const uploadForm = document.querySelector('#upload-form');
+if (uploadForm) { loadUploadOptions(); uploadForm.addEventListener('submit', async (event) => { event.preventDefault(); const error = document.querySelector('#upload-error'); const success = document.querySelector('#upload-success'); error.textContent = ''; success.textContent = ''; try { const result = await json(await api('/api/jobs', { method: 'POST', body: new FormData(uploadForm) })); success.textContent = `Queued ${result.filename}.`; uploadForm.reset(); } catch (err) { error.textContent = err.message; } }); }

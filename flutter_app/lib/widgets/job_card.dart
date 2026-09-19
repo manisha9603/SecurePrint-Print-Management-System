@@ -1,0 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../models/job.dart';
+import 'status_pill.dart';
+class JobCard extends StatelessWidget { final PrintJob job; final VoidCallback? onRetry; final VoidCallback? onCancel; const JobCard(this.job, {this.onRetry, this.onCancel, super.key}); @override Widget build(BuildContext context) { final canRetry = job.status == JobStatus.failed || job.status == JobStatus.cancelled; final canCancel = job.status == JobStatus.pending; return Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8), leading: const Icon(Icons.description_outlined), title: Text(job.filename, maxLines: 1, overflow: TextOverflow.ellipsis), subtitle: Text('${job.printerName ?? 'Any printer'}  •  ${DateFormat('MMM d, HH:mm').format(job.createdAt)}'), trailing: Row(mainAxisSize: MainAxisSize.min, children: [if (canRetry) TextButton(onPressed: onRetry, child: const Text('Retry')), if (canCancel) TextButton(onPressed: onCancel, child: const Text('Cancel')), StatusPill(job.status.name)]))); } }

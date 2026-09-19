@@ -1,0 +1,3 @@
+import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
+class StatusPill extends StatelessWidget { final String label; final Color? color; const StatusPill(this.label, {this.color, super.key}); @override Widget build(BuildContext context) { final tone = color ?? (label == 'completed' || label == 'online' || label == 'Connected' ? AppTheme.green : label == 'failed' ? AppTheme.red : AppTheme.amber); return Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), decoration: BoxDecoration(color: tone.withAlpha(25), border: Border.all(color: tone.withAlpha(90)), borderRadius: BorderRadius.circular(4)), child: Text(label.toUpperCase(), style: TextStyle(color: tone, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: .8))); } }
